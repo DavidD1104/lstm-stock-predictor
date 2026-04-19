@@ -15,7 +15,7 @@ Aplicación web interactiva para predicción de precios de acciones bursátiles 
 ![Resultados TSLA](docs/screenshot_tsla.png)
 
 ### AAPL — Apple Inc.
-![Resultados AAPL](docs/screenshot_aapl.png)
+![Resultados AAPL](docs/screenshot_appl.png)
 
 ---
 
