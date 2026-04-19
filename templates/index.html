@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockSense LSTM — Predicción con IA</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+
+  <!-- App styles -->
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+
+<body>
+<div class="app">
+
+  <!-- ══ Header ══════════════════════════════════════════════════════════ -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-icon">📈</div>
+        <div>
+          <h1 class="gradient-text">StockSense <span class="badge">LSTM</span></h1>
+          <div class="brand-sub">Predicción de precios bursátiles con Deep Learning</div>
+        </div>
+      </div>
+      <div class="header-tag">Redes Neuronales Recurrentes · Monte Carlo Dropout</div>
+    </div>
+  </header>
+
+  <!-- ══ Main layout ══════════════════════════════════════════════════════ -->
+  <div class="main-layout">
+
+    <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
+    <aside class="sidebar">
+
+      <!-- Stock selector -->
+      <div class="sidebar-section">
+        <div class="section-title">Seleccionar acción</div>
+
+        <div class="sector-filters">
+          <button class="filter-btn active" data-sector="all">Todas</button>
+          <button class="filter-btn" data-sector="Tecnología">Tech</button>
+          <button class="filter-btn" data-sector="Finanzas">Finanzas</button>
+          <button class="filter-btn" data-sector="Consumo">Consumo</button>
+          <button class="filter-btn" data-sector="Salud">Salud</button>
+          <button class="filter-btn" data-sector="Energía">Energía</button>
+          <button class="filter-btn" data-sector="Entretenimiento">Media</button>
+        </div>
+
+        <div class="stock-grid" id="stock-grid">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Preset recommendation (shown after stock selection) -->
+        <div class="preset-hint" id="preset-hint" style="display:none;">
+          <div class="preset-hint-header">
+            <span id="preset-tag"></span>
+            <span style="font-size:0.63rem; color:var(--text-2);">Parámetros sugeridos</span>
+          </div>
+          <div class="preset-params" id="preset-params"></div>
+          <div class="preset-hint-note" style="font-size:0.63rem; color:var(--text-2); font-style:italic; margin-bottom:8px;"></div>
+          <button class="preset-apply-btn" id="preset-apply-btn">Aplicar configuración recomendada</button>
+        </div>
+      </div>
+
+      <!-- Model settings -->
+      <div class="sidebar-section">
+        <div class="section-title">Configuración del modelo</div>
+
+        <!-- Date range -->
+        <div class="setting-row">
+          <div class="setting-label">Rango de datos históricos</div>
+          <div class="date-row">
+            <input type="date" id="start-date" title="Fecha inicio" />
+            <input type="date" id="end-date"   title="Fecha fin" />
+          </div>
+        </div>
+
+        <!-- Epochs -->
+        <div class="setting-row">
+          <div class="setting-label">
+            Épocas de entrenamiento
+            <span id="epochs-val">25</span>
+          </div>
+          <input type="range" id="epochs-slider" min="10" max="100" value="25" step="5" />
+        </div>
+
+        <!-- Window -->
+        <div class="setting-row">
+          <div class="setting-label">
+            Ventana temporal
+            <span id="window-val">30</span> días
+          </div>
+          <input type="range" id="window-slider" min="10" max="60" value="30" step="5" />
+        </div>
+
+        <!-- Forecast toggle -->
+        <div class="setting-row">
+          <label class="toggle-row" for="forecast-toggle">
+            <input type="checkbox" id="forecast-toggle" checked class="toggle-check" />
+            <span>Incluir pronóstico futuro</span>
+          </label>
+        </div>
+
+        <!-- Forecast days (visible when toggle is on) -->
+        <div class="setting-row" id="forecast-days-row">
+          <div class="setting-label">
+            Horizonte de predicción
+            <span id="forecast-val">10</span> días
+          </div>
+          <input type="range" id="forecast-slider" min="5" max="30" value="10" step="1" />
+        </div>
+      </div>
+
+      <!-- Train button -->
+      <button class="train-btn" id="train-btn">
+        <div class="btn-spinner" id="btn-spinner"></div>
+        <span id="btn-text">Entrenar Modelo</span>
+        <span>🚀</span>
+      </button>
+
+      <!-- Progress -->
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-info">
+          <span id="epoch-info">Época 0 / 25</span>
+          <strong id="progress-pct">0%</strong>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="loss-preview" id="loss-preview"></div>
+      </div>
+
+      <!-- Model info card -->
+      <div class="sidebar-section">
+        <div class="section-title">Arquitectura LSTM</div>
+        <div style="font-size:0.7rem; color:var(--text-2); line-height:1.8;">
+          <div>● <strong style="color:var(--cyan)">LSTM</strong>(100 units, dropout=0.2)</div>
+          <div>● <strong style="color:var(--purple)">LSTM</strong>(50 units, dropout=0.2)</div>
+          <div>● <strong style="color:var(--text-1)">Dense</strong>(25, ReLU)</div>
+          <div>● <strong style="color:var(--text-1)">Dense</strong>(1, Linear)</div>
+          <div style="margin-top:8px; padding-top:8px; border-top: 1px solid var(--border);">
+            Optimizador: <strong style="color:var(--amber)">Adam</strong> · Loss: <strong style="color:var(--amber)">MSE</strong><br/>
+            Incertidumbre: <strong style="color:var(--green)">Monte Carlo Dropout</strong><br/>
+            Datos: <strong style="color:var(--green)">Yahoo Finance</strong>
+          </div>
+        </div>
+      </div>
+
+    </aside><!-- /sidebar -->
+
+    <!-- ── Content area ─────────────────────────────────────────────────── -->
+    <div class="content">
+
+      <!-- Welcome screen -->
+      <div class="welcome" id="welcome">
+        <div class="welcome-icon">📊</div>
+        <h2 class="gradient-text">Predicción de acciones con LSTM</h2>
+        <p>
+          Selecciona una acción del panel izquierdo, ajusta los parámetros del modelo
+          y pulsa <strong>Entrenar Modelo</strong> para ver cómo la red neuronal aprende
+          a predecir el precio futuro.
+        </p>
+        <div class="welcome-chips">
+          <span class="chip">📉 Series temporales</span>
+          <span class="chip">🧠 Deep Learning</span>
+          <span class="chip">📐 Ventana deslizante</span>
+          <span class="chip">🎲 Monte Carlo</span>
+          <span class="chip">📏 MAE · RMSE · R²</span>
+          <span class="chip">🔴 Datos en tiempo real</span>
+        </div>
+      </div>
+
+      <!-- Results area (hidden until training completes) -->
+      <div id="results-area" style="display:none; flex-direction:column; gap:18px;">
+
+        <!-- Result header -->
+        <div class="result-header">
+          <div class="rh-ticker gradient-text" id="rh-ticker">—</div>
+          <div class="rh-name" id="rh-name"></div>
+          <div class="rh-badge">Modelo entrenado ✓</div>
+        </div>
+
+        <!-- Training summary -->
+        <div class="training-summary" id="training-summary"></div>
+
+        <!-- Main chart -->
+        <div class="chart-card">
+          <div class="chart-title">
+            <span class="chart-title-dot"></span>
+            <span id="main-chart-title">Serie histórica · Predicciones test · Pronóstico futuro</span>
+          </div>
+          <div id="main-chart"></div>
+        </div>
+
+        <!-- Metrics row -->
+        <div class="metrics-row">
+          <div class="metric-card">
+            <div class="metric-val" id="m-mae">—</div>
+            <div class="metric-label">MAE</div>
+            <div class="metric-desc">Error absoluto medio</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-val" id="m-rmse">—</div>
+            <div class="metric-label">RMSE</div>
+            <div class="metric-desc">Error cuadrático medio</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-val" id="m-mape">—</div>
+            <div class="metric-label">MAPE</div>
+            <div class="metric-desc">Error porcentual medio</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-val" id="m-r2">—</div>
+            <div class="metric-label">R²</div>
+            <div class="metric-desc">Coeficiente de determinación</div>
+          </div>
+        </div>
+
+        <!-- Secondary charts -->
+        <div class="secondary-charts">
+          <div class="chart-card">
+            <div class="chart-title">
+              <span class="chart-title-dot" style="background:var(--purple);"></span>
+              Curvas de entrenamiento
+            </div>
+            <div id="loss-chart"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">
+              <span class="chart-title-dot" style="background:var(--amber);"></span>
+              Distribución de errores
+            </div>
+            <div id="error-chart"></div>
+          </div>
+        </div>
+
+        <!-- Methodology note -->
+        <div class="chart-card" style="font-size:0.75rem; color:var(--text-2); line-height:1.8;">
+          <div class="chart-title">
+            <span class="chart-title-dot" style="background:var(--green);"></span>
+            Metodología
+          </div>
+          <strong style="color:var(--text-1)">Datos:</strong>
+          Precios de cierre ajustados descargados de Yahoo Finance.
+          División temporal 80/20 (sin shuffling) para evitar data leakage.<br/>
+          <strong style="color:var(--text-1)">LSTM:</strong>
+          Red neuronal con 2 capas recurrentes. Ventana deslizante de N días como contexto.
+          EarlyStopping y ReduceLROnPlateau para regularización.<br/>
+          <strong style="color:var(--text-1)">Incertidumbre:</strong>
+          Intervalo de confianza generado con <em>Monte Carlo Dropout</em>
+          (40 muestras con dropout activo en inferencia).
+          Las bandas representan ±1σ (68%) y ±2σ (95%).<br/>
+          <strong style="color:var(--amber)">Aviso:</strong>
+          Este modelo es únicamente demostrativo. No constituye asesoramiento financiero.
+        </div>
+
+      </div><!-- /results-area -->
+
+    </div><!-- /content -->
+
+  </div><!-- /main-layout -->
+
+</div><!-- /app -->
+
+<!-- Toast notifications -->
+<div id="toast-area"></div>
+
+<!-- App JS -->
+<script src="/static/js/app.js"></script>
+</body>
+</html>

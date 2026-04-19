@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Entorno virtual
+venv/
+.venv/
+env/
+
+# TensorFlow / Keras
+*.h5
+*.keras
+*.pb
+logs/
+checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistema
+Thumbs.db
+.DS_Store
+
+# Imágenes generadas por el script standalone
+entrenamiento_lstm.png
+prediccion_serie_completa.png
+prediccion_zoom_test.png
+distribucion_error.png
